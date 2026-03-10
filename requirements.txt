@@ -1,0 +1,5 @@
+fastapi=0.128.0
+colorama=0.4.6
+uvicorn=0.40.0
+python-multipart=0.0.22
+pyfiglet=1.0.4
