@@ -43,7 +43,7 @@ def show_welcome() -> None:
 def login() -> str:
     """简单用户登录"""
     while True:
-        user = str(input("请输入用户名:"))
+        user = str(input("请输入用户名:")).strip()
         if user not in user_list:
             click.echo("用户不存在")
             continue

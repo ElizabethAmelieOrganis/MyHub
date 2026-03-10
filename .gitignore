@@ -23,6 +23,11 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Build artifacts
+build/
+dist/
+*.spec
+
 # Project specific
 server/files/*
 !server/files/.gitkeep
