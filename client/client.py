@@ -14,12 +14,12 @@ from dotenv import load_dotenv
 # ==========配置文件==========
 load_dotenv()
 config: dict = {
-    "title": os.getenv("title", ""),
-    "version": os.getenv("version", ""),
-    "upload_day": os.getenv("upload_day"),
-    "run_env": os.getenv("run_env"),
-    "server_url": os.getenv("server_url"),
-    "server_port": os.getenv("server_port"),
+    "title": os.getenv("title", "MyHub"),
+    "version": os.getenv("version", "1.0.0"),
+    "upload_day": os.getenv("upload_day","2026.3.10"),
+    "run_env": os.getenv("run_env","windows"),
+    "server_url": os.getenv("server_url","127.0.0.1"),
+    "server_port": os.getenv("server_port","8000")
 }
 SERVER_ADDRESS: str = f"http://{config['server_url']}:{config['server_port']}"
 init(autoreset=True)

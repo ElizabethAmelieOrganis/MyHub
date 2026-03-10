@@ -5,17 +5,21 @@ MyHub服务端
 
 from contextlib import asynccontextmanager
 from datetime import datetime
+import os
 from pathlib import Path
 from typing import Optional
 
 from database import get_db, init_db
 from fastapi import FastAPI, Header, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from utils import println_failed, println_success
 
 # ==========配置文件==========
 FILES_DIR = Path("./files")
 FILES_DIR.mkdir(exist_ok=True)
+MAX_UPLOAD_BYTES = int(os.getenv("MYHUB_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
+UPLOAD_CHUNK_SIZE = int(os.getenv("MYHUB_UPLOAD_CHUNK_SIZE", str(1024 * 1024)))
 # 可用token
 USERS = {"HY-token": {"name": "HY"}, "LCY-token": {"name": "LCY"}}
 
@@ -60,6 +64,23 @@ def verify_token(token: str | None) -> str:
 app = FastAPI(title="MyHub", version="1.0.0", lifespan=start_up)
 
 # ==========路由==========
+
+class UploadTooLarge(Exception):
+    pass
+
+
+def save_upload_file_to_disk(upload_file: UploadFile, dest_path: Path) -> int:
+    total = 0
+    with open(dest_path, "wb") as out:
+        while True:
+            chunk = upload_file.file.read(UPLOAD_CHUNK_SIZE)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_UPLOAD_BYTES:
+                raise UploadTooLarge()
+            out.write(chunk)
+    return total
 
 
 @app.get("/")
@@ -140,17 +161,26 @@ async def upload_file(
     file_path = FILES_DIR / final_stored_name
     
     try:
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
+        size = await run_in_threadpool(save_upload_file_to_disk, file, file_path)
+    except UploadTooLarge:
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(status_code=413, detail=f"文件过大，最大允许 {MAX_UPLOAD_BYTES} 字节")
     except Exception as e:
+        if file_path.exists():
+            file_path.unlink()
         raise HTTPException(status_code=500, detail=f"文件保存失败: {e}")
+    finally:
+        try:
+            await file.close()
+        except Exception:
+            pass
         
     with get_db() as conn:
         conn.execute(
             """INSERT INTO files(original_name, stored_name, size, uploader, upload_time)
                VALUES (?, ?, ?, ?, ?)""",
-            (file.filename, final_stored_name, len(contents), user, datetime.now().isoformat())
+            (file.filename, final_stored_name, size, user, datetime.now().isoformat())
         )
         
     return {"message": "文件上传成功", "stored_name": final_stored_name}
